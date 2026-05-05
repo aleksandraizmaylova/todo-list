@@ -1,4 +1,4 @@
-﻿function createElement(tag, attributes, children) {
+﻿function createElement(tag, attributes, children, callbacks = {}) {
   const element = document.createElement(tag);
 
   if (attributes) {
@@ -21,6 +21,12 @@
     element.appendChild(children);
   }
 
+  if (callbacks) {
+    Object.entries(callbacks).forEach(([event, handler]) => {
+      element.addEventListener(event, handler);
+    });
+  }
+
   return element;
 }
 
@@ -35,6 +41,18 @@ class Component {
 }
 
 class TodoList extends Component {
+  constructor() {
+    super();
+    this.state = {
+      todos: [
+        { text: "Сделать домашку" },
+        { text: "Сделать практику" },
+        { text: "Пойти домой" }
+      ],
+      newTodo: ""
+    };
+  }
+
   render() {
     return createElement("div", { class: "todo-list" }, [
       createElement("h1", {}, "TODO List"),
@@ -43,30 +61,35 @@ class TodoList extends Component {
           id: "new-todo",
           type: "text",
           placeholder: "Задание",
-        }),
-        createElement("button", { id: "add-btn" }, "+"),
+        }, { input: this.onAddInputChange }),
+        createElement("button", { id: "add-btn" }, "+", { input: this.onAddInputChange }),
       ]),
-      createElement("ul", { id: "todos" }, [
-        createElement("li", {}, [
-          createElement("input", { type: "checkbox" }),
-          createElement("label", {}, "Сделать домашку"),
-          createElement("button", {}, "🗑️")
-        ]),
-        createElement("li", {}, [
-          createElement("input", { type: "checkbox" }),
-          createElement("label", {}, "Сделать практику"),
-          createElement("button", {}, "🗑️")
-        ]),
-        createElement("li", {}, [
-          createElement("input", { type: "checkbox" }),
-          createElement("label", {}, "Пойти домой"),
-          createElement("button", {}, "🗑️")
-        ]),
-      ]),
+
+      createElement("ul", { id: "todos" }, this.state.todos.map((todo) =>
+          createElement("li", {}, [
+            createElement("input", { type: "checkbox" }),
+            createElement("label", {}, todo.text),
+            createElement("button", {}, "🗑️")
+          ])
+      )),
     ]);
+  }
+
+  onAddTask(e) {
+    this.state.newTodo = e.target.value;
+  }
+
+  onAddInputChange() {
+    const text = this.state.newTodoText.trim();
+    if (text) {
+      this.state.todos.push({ text });
+      this.state.newTodoText = "";
+    }
   }
 }
 
 document.addEventListener("DOMContentLoaded", () => {
   document.body.appendChild(new TodoList().getDomNode());
 });
+
+
