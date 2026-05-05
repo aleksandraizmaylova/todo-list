@@ -2,28 +2,36 @@
   const element = document.createElement(tag);
 
   if (attributes) {
-    Object.keys(attributes).forEach((key) => {
-      element.setAttribute(key, attributes[key]);
+    Object.entries(attributes).forEach(([key, value]) => {
+      if (key === "checked") {
+        element.checked = !!value;
+      } else if (key === "value") {
+        element.value = value || "";
+      } else if (value !== undefined && value !== null) {
+        element.setAttribute(key, value);
+      }
     });
   }
 
-  if (Array.isArray(children)) {
-    children.forEach((child) => {
-      if (typeof child === "string") {
-        element.appendChild(document.createTextNode(child));
-      } else if (child instanceof HTMLElement) {
-        element.appendChild(child);
-      }
-    });
-  } else if (typeof children === "string") {
-    element.appendChild(document.createTextNode(children));
-  } else if (children instanceof HTMLElement) {
-    element.appendChild(children);
+  if (children) {
+    if (Array.isArray(children)) {
+      children.forEach((child) => {
+        if (typeof child === "string") {
+          element.appendChild(document.createTextNode(child));
+        } else if (child instanceof HTMLElement) {
+          element.appendChild(child);
+        }
+      });
+    } else if (typeof children === "string") {
+      element.appendChild(document.createTextNode(children));
+    } else if (children instanceof HTMLElement) {
+      element.appendChild(children);
+    }
   }
 
   if (callbacks) {
     Object.entries(callbacks).forEach(([event, handler]) => {
-      element.addEventListener(event, handler);
+      if (handler) element.addEventListener(event, handler);
     });
   }
 
@@ -31,12 +39,19 @@
 }
 
 class Component {
-  constructor() {
-  }
+  constructor() {}
 
   getDomNode() {
     this._domNode = this.render();
     return this._domNode;
+  }
+
+  update() {
+    const newDom = this.render();
+    if (this._domNode && this._domNode.parentNode) {
+      this._domNode.replaceWith(newDom);
+    }
+    this._domNode = newDom;
   }
 }
 
@@ -45,9 +60,9 @@ class TodoList extends Component {
     super();
     this.state = {
       todos: [
-        { text: "Сделать домашку" },
-        { text: "Сделать практику" },
-        { text: "Пойти домой" }
+        { text: "Сделать домашку", completed: false },
+        { text: "Сделать практику", completed: false },
+        { text: "Пойти домой", completed: false }
       ],
       newTodo: ""
     };
@@ -61,35 +76,49 @@ class TodoList extends Component {
           id: "new-todo",
           type: "text",
           placeholder: "Задание",
-        }, { input: this.onAddInputChange }),
-        createElement("button", { id: "add-btn" }, "+", { input: this.onAddInputChange }),
+          value: this.state.newTodo
+        }, null, { input: (e) => this.onInputChange(e) }),
+        createElement("button", { id: "add-btn" }, "+", { click: () => this.addTask() }),
       ]),
-
-      createElement("ul", { id: "todos" }, this.state.todos.map((todo) =>
-          createElement("li", {}, [
-            createElement("input", { type: "checkbox" }),
-            createElement("label", {}, todo.text),
-            createElement("button", {}, "🗑️")
-          ])
+      createElement("ul", { id: "todos" }, this.state.todos.map((todo, index) =>
+        createElement("li", {}, [
+          createElement("input", {
+            type: "checkbox",
+            checked: todo.completed
+          }, null, { change: () => this.toggleTodo(index) }),
+          createElement("label", {
+            style: todo.completed ? "color: gray; text-decoration: line-through;" : ""
+          }, todo.text),
+          createElement("button", {}, "🗑️", { click: () => this.deleteTodo(index) })
+        ])
       )),
     ]);
   }
 
-  onAddTask(e) {
+  onInputChange(e) {
     this.state.newTodo = e.target.value;
   }
 
-  onAddInputChange() {
-    const text = this.state.newTodoText.trim();
+  addTask() {
+    const text = this.state.newTodo.trim();
     if (text) {
-      this.state.todos.push({ text });
-      this.state.newTodoText = "";
+      this.state.todos.push({ text, completed: false });
+      this.state.newTodo = "";
+      this.update();
     }
+  }
+
+  toggleTodo(index) {
+    this.state.todos[index].completed = !this.state.todos[index].completed;
+    this.update();
+  }
+
+  deleteTodo(index) {
+    this.state.todos.splice(index, 1);
+    this.update();
   }
 }
 
 document.addEventListener("DOMContentLoaded", () => {
   document.body.appendChild(new TodoList().getDomNode());
 });
-
-
