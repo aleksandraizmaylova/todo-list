@@ -81,7 +81,7 @@ class AddTask extends Component {
         id: "new-todo",
         type: "text",
         placeholder: "Задание",
-        value: this.state.newTodo
+        value: this.state.newTodo,
       }, null, { input: (e) => this.onInputChange(e) }),
       createElement("button", { id: "add-btn" }, "+", { click: () => this.addTask() }),
     ]);
@@ -98,6 +98,14 @@ class Task extends Component {
     this.state = { confirmDelete: false };
   }
 
+  updateProps(todo, index, onToggle, onDelete) {
+    this.todo = todo;
+    this.index = index;
+    this.onToggle = onToggle;
+    this.onDelete = onDelete;
+    this.update();
+  }
+
   handleDelete() {
     if (this.state.confirmDelete) {
       this.onDelete(this.index);
@@ -111,14 +119,14 @@ class Task extends Component {
     return createElement("li", {}, [
       createElement("input", {
         type: "checkbox",
-        checked: this.todo.completed
+        checked: this.todo.completed,
       }, null, { change: () => this.onToggle(this.index) }),
       createElement("label", {
-        style: this.todo.completed ? "color: gray; text-decoration: line-through;" : ""
+        style: this.todo.completed ? "color: gray; text-decoration: line-through;" : "",
       }, this.todo.text),
       createElement("button", {
-        style: this.state.confirmDelete ? "background-color: red;" : ""
-      }, "🗑️", { click: () => this.handleDelete() })
+        style: this.state.confirmDelete ? "background-color: red;" : "",
+      }, "🗑️", { click: () => this.handleDelete() }),
     ]);
   }
 }
@@ -127,36 +135,86 @@ class TodoList extends Component {
   constructor() {
     super();
     this.state = {
-      todos: [
-        { text: "Сделать домашку", completed: false },
-        { text: "Сделать практику", completed: false },
-        { text: "Пойти домой", completed: false }
-      ]
+      todos: this.loadFromLocalStorage() || [
+        { id: this.generateId(), text: "Сделать домашку", completed: false },
+        { id: this.generateId(), text: "Сделать практику", completed: false },
+        { id: this.generateId(), text: "Пойти домой", completed: false },
+      ],
     };
+    this.taskComponents = [];
+    this.addTaskComponent = new AddTask((text) => this.addTask(text));
+    this.syncTasks();
+  }
+
+  generateId() {
+    return Date.now() + '-' + Math.random().toString(36).substr(2, 6);
+  }
+
+  saveToLocalStorage() {
+    localStorage.setItem('todoListData', JSON.stringify(this.state.todos));
+  }
+
+  loadFromLocalStorage() {
+    const data = localStorage.getItem('todoListData');
+    if (data) {
+      const todos = JSON.parse(data);
+      return todos.map(todo => todo.id ? todo : { ...todo, id: this.generateId() });
+    }
+    return null;
+  }
+
+  syncTasks() {
+    const newTaskComponents = [];
+    const oldComponentsMap = new Map();
+    this.taskComponents.forEach(comp => oldComponentsMap.set(comp.todo.id, comp));
+
+    this.state.todos.forEach((todo, idx) => {
+      if (oldComponentsMap.has(todo.id)) {
+        const existingComp = oldComponentsMap.get(todo.id);
+        existingComp.updateProps(todo, idx, (i) => this.toggleTodo(i), (i) => this.deleteTodo(i));
+        newTaskComponents.push(existingComp);
+      } else {
+        const newComp = new Task(todo, idx, (i) => this.toggleTodo(i), (i) => this.deleteTodo(i));
+        newTaskComponents.push(newComp);
+      }
+    });
+
+    this.taskComponents = newTaskComponents;
   }
 
   addTask(text) {
-    this.state.todos.push({ text, completed: false });
+    const newTodo = {
+      id: this.generateId(),
+      text,
+      completed: false,
+    };
+    this.state.todos.push(newTodo);
+    this.saveToLocalStorage();
+    this.syncTasks();
     this.update();
   }
 
   toggleTodo(index) {
     this.state.todos[index].completed = !this.state.todos[index].completed;
+    this.saveToLocalStorage();
+    this.syncTasks();
     this.update();
   }
 
   deleteTodo(index) {
     this.state.todos.splice(index, 1);
+    this.saveToLocalStorage();
+    this.syncTasks();
     this.update();
   }
 
   render() {
     return createElement("div", { class: "todo-list" }, [
       createElement("h1", {}, "TODO List"),
-      new AddTask((text) => this.addTask(text)).getDomNode(),
-      createElement("ul", { id: "todos" }, this.state.todos.map((todo, index) =>
-          new Task(todo, index, (idx) => this.toggleTodo(idx), (idx) => this.deleteTodo(idx)).getDomNode()
-      ))
+      this.addTaskComponent.getDomNode(),
+      createElement("ul", { id: "todos" },
+        this.taskComponents.map(comp => comp.getDomNode())
+      ),
     ]);
   }
 }
